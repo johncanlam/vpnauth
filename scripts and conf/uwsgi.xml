@@ -1,0 +1,16 @@
+<uwsgi>
+<socket>0.0.0.0:8000</socket>
+<listen>204800</listen>
+<processes>32</processes>    #开启32个线程
+<max-requests>2048000</max-requests>
+<buffer-size>8192</buffer-size>
+<module>django_wsgi</module>     #你的配置文件
+<profiler>true</profiler>
+<enable-threads>true</enable-threads>
+<pythonpath>/data/django/</pythonpath>
+<pythonpath>/data/django/vpnauth/</pythonpath>
+<limit-as>256</limit-as>    #限制内存空间256M
+<disable-logging/>
+<daemonize>/var/log/uwsgi.log</daemonize>
+</uwsgi>
+

@@ -1,0 +1,33 @@
+<html>
+<head>
+    <title>修改VPN密码</title>
+</head>
+<body>
+    <h1>修改VPN密码</h1>
+请输入用户名和原密码，即可修改，系统自动生成新密码，修改成功后，将打印新密码，请妥善保存新密码。
+<br/>
+如有问题，请联系运维。
+
+    {% if form.errors %}
+        <p style="color: red;">
+           请修复以下错误! 
+        </p>
+    {% endif %}
+
+    <form action="/save/" method="post">{% csrf_token %}
+        <table>
+ {% for field in form %}
+{{ field.label_tag }}: {{ field }}
+    {{ field.errors }}
+</br>
+{%endfor%}
+
+<!--            {{ form.as_table }} */-->
+        </table>
+        <input type="submit" value="修改">
+    </form>
+</body>
+</html>
+
+
+
