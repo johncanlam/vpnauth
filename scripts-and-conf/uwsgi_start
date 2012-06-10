@@ -1,0 +1,2 @@
+cd /data/django/scripts-and-conf/
+/usr/bin/uwsgi -x uwsgi.xml

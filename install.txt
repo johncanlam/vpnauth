@@ -1,20 +1,22 @@
+一、本程序是一个管理OpenVPN的帐号的Web程序，主要功能
+1、用户的增/删/改/查
+2、查看用户的登录日志
 
 
-
-
-#使用本程序后
+二、与OpenVPN默认管理方式对比
 
 	1、原来OpenVPN是通过文件来管理用户名和密码的，需要ssh到服务器上管理，现在通过Web管理，不用ssh到服务器去管理用户
-	2、密码原理是明文，现在是加密的
+	2、密码原来是明文，现在是加密的
 	3、日志入库，通过Web看登录日志
 
+
+
+三、安装sqlite
 因为我们vpnauth用的是sqlite3数据库，在安装Python前，需要确认系统上已经安装sqlite3和sqlite3的开发库，否则在Python安装过程中
 如果找不到sqlite3的开发库，就不会编译安装sqlite3的相关模块
-
-#安装sqlite
 	yum -y install sqlite sqlite-devel
 
-#下载相关软件	
+四、下载相关软件	
 	mkdir /root/python
 	cd /root/python
 	wget http://www.python.org/ftp/python/2.7.2/Python-2.7.2.tar.bz2
@@ -22,7 +24,7 @@
 	wget http://projects.unbit.it/downloads/uwsgi-0.9.8.3.tar.gz
 
 	
-#安装相关软件，如果原来已经有安装，可以忽略
+五、安装相关软件，如果原来已经有安装，可以忽略
 	##安装Python和Django
 		tar xjf Python-2.7.2.tar.bz2
 		cd Python-2.7.2
@@ -61,6 +63,8 @@
 		cd /usr/local/nginx/
 		mv conf conf_bak
 		ln -s /data/conf/nginx/ conf
+		mkdir /data/conf/nginx/vhost
+		vi /
 		
 		echo 'export LD_PRELOAD=/usr/local/lib/libtcmalloc.so' > /root/nginx_start
 		echo 'ulimit -SHn 65535' >> /root/nginx_start
@@ -85,93 +89,60 @@
 		make -f Makefile.Py27
 		编译完成后，会在当前目录生成uwsgi文件，我们把它拷贝到/usr/bin目录下
 		/bin/cp uwsgi /usr/bin/
-#部署程序	
-
-	
-	我们把我们的应用放到/data/django下
+六、部署程序	
+	我们把应用放到/data/django下
 	mkdir /data/django
 	cd /data/django
-	tar xf vpnauth.tar
+	tar xf vpnauth.tar.gz
 	先看下解压缩出来后的文件
-	vpnauth  #主程序
-	scripts and conf  #这个目录是一些脚本和配置
-	#开始配置
-	#OpenVPN是以nobody用户运行的，这里把程序的所有者也改成nobody
-	chown -R nobody.nobody vpnauth
-	cd vpnauth
-	
-	编写uwsgi的配置文件
-	vi uwsgi.xml
-	
-<uwsgi>
-<socket>0.0.0.0:8000</socket>
-<listen>16</listen>
-<processes>8</processes>    #开启8个线程
-<max-requests>2048000</max-requests>
-<buffer-size>8192</buffer-size>
-<module>django_wsgi</module>     #你的配置文件,需要放到应用根目录/data/django/vpnauth/django_wsgi.py
-<profiler>true</profiler>
-<enable-threads>true</enable-threads>
-<pythonpath>/data/django/</pythonpath>
-<pythonpath>/data/django/vpnauth/</pythonpath>
-<limit-as>256</limit-as>    #限制内存空间256M
-<disable-logging/>
-<daemonize>/var/log/uwsgi.log</daemonize>
-<touch-reload>/tmp/uwsgi_reload</touch-reload> #通过touch /tmp/uwsgi_reload文件来重启uwsgi，读取新的Python代码
-</uwsgi>
+	主要是2个目录
+	1、脚本和配置
+	scripts-and-conf 
+	cd scripts-and-conf
+		checkpsw.py #OpenVPN认证的脚本，假设OpenVPN的配置放在/etc/openvpn下
+		
+		/bin/cp checkpsw.py /etc/openvpn
+		chmod 755 /etc/openvpn/checkpsw.py
+		
+		uwsgi_start	   #开启uwsgi的脚本	
+		uwsgi_reload   #重启uwsgi
+		uwsgi_stop		#关闭uwsgi的脚本
+		
+		/bin/cp uwsgi_start uwsgi_reload uwsgi_stop /root/
+		chmod 700 /root/uwsgi*
+		
+		uwsgi.xml	  #uwsgi的配置文件
+		uwsgi_params  #Nginx处理uwsgi的配置文件
+		vpnauth.conf	#Nginx的虚拟主机配置文件
+		
+		/bin/cp uwsgi_params /data/conf/nginx
+		/bin/cp vpnauth.conf /data/conf/nginx/vhost
+		vi /data/conf/nginx/nginx.conf
+		在最后一个}前加入以下内容
+		include vhost/* ;
+		使Nginx包含vhost下的配置文件
+		
+		conv_to_db.py #读取原来的密码文件，把帐号密码存到数据库
+	2、主程序	
+	vpnauth  
+		#开始配置
+		#OpenVPN是以nobody用户运行的，这里把程序的所有者也改成nobody
+		chown -R nobody.nobody vpnauth
+		cd vpnauth
+		#创建数据库结构和超级管理员用户
+		python2.7 manage.py syncdb
 
-编辑配置文件
-vi django_wsgi.py
-#!/opt/python27/bin/python2.7
-import os
-import django.core.handlers.wsgi
-os.environ['DJANGO_SETTINGS_MODULE'] = 'vpnauth.settings'
-application = django.core.handlers.wsgi.WSGIHandler()
+七、修改OpenVPN配置文件
+vi /etc/openvpn/server.conf
+将
+auth-user-pass-verify /etc/openvpn/checkpsw.sh via-env
+改为
+auth-user-pass-verify /etc/openvpn/checkpsw.py via-env
 
-vi /usr/local/nginx/conf/uwsgi_params
-uwsgi_param  QUERY_STRING       $query_string; 
-uwsgi_param  REQUEST_METHOD     $request_method; 
-uwsgi_param  CONTENT_TYPE       $content_type; 
-uwsgi_param  CONTENT_LENGTH     $content_length; 
+service openvpn restart
 
-uwsgi_param  REQUEST_URI        $request_uri; 
-uwsgi_param  PATH_INFO          $document_uri; 
-uwsgi_param  DOCUMENT_ROOT      $document_root; 
-uwsgi_param  SERVER_PROTOCOL    $server_protocol; 
-
-uwsgi_param  REMOTE_ADDR        $remote_addr; 
-uwsgi_param  REMOTE_PORT        $remote_port; 
-uwsgi_param  SERVER_PORT        $server_port; 
-uwsgi_param  SERVER_NAME        $server_name; 
-
-
-vi /usr/local/nginx/conf/vhost/vpnauth.conf
-server {
-        listen   80;
-        server_name vpnauth.example.com;
-        access_log /var/log/access_log;
-		error_log /var/log/error_log;
-        location / {
-                root   /data/django/vpnauth;
-                uwsgi_pass 127.0.0.1:8000;
-                include        uwsgi_params;
-        }
-		        location /static/admin/{
-        alias /opt/python27/lib/python2.7/site-packages/django/contrib/admin/media/;
-        break;
-        }
-}
-
-
-vi /root/uwsgi_start
-cd /data/django/vpnauth/
-/usr/bin/uwsgi -x uwsgi.xml
-
-vi /root/uwsgi_stop
-killall uwsgi
-
-chmod 700 /root/uwsgi* 
-
+		
+八、开启程序，进行访问		
 /root/nginx_start
 /root/uwsgi_start
 
@@ -181,6 +152,9 @@ http://vpnauth.example.com/
 管理后台地址
 http://vpnauth.example.com/admin
 
+
+
+九、其他东西
 将现有帐号密码导入到数据库中
 参见conv_to_db.py
 
@@ -189,17 +163,6 @@ http://vpnauth.example.com/admin
 参见checkpsw.py
 原理:从环境变量获得username和password，然后调用authenticate进行验证，如果有该用户，则退出状态为0，表示认证成功，否则退出状态为1，验证不成功，主要是参考checkpsw.sh改的。
 
-修改OpenVPN配置文件
-vi /etc/openvpn/server.conf
-将
-auth-user-pass-verify /etc/openvpn/checkpsw.sh via-env
-改为
-auth-user-pass-verify /etc/openvpn/checkpsw.py via-env
-
-service openvpn restart
-
-可以用以下命令跟踪认证过程
-tail -f /var/log/openvpn.log
 
 
 一些命令
@@ -227,6 +190,8 @@ u[0].password
 删除所有用户
 u.delete()
 
-
+#####
+交流QQ群
+92512677
 
 
