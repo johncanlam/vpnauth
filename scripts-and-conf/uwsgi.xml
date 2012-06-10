@@ -12,5 +12,6 @@
 <limit-as>256</limit-as>    #限制内存空间256M
 <disable-logging/>
 <daemonize>/var/log/uwsgi.log</daemonize>
+<touch-reload>/tmp/uwsgi_reload</touch-reload> #通过touch /tmp/uwsgi_reload文件来重启uwsgi，读取新的Python代码
 </uwsgi>
 
